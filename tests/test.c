@@ -1342,7 +1342,7 @@ static void test_hpkp(void)
 		wget_hpkp_db_add(hpkp_db, &hpkp);
 	}
 
-	// check HSTS database with values
+	// check HPKP database with values
 	for (unsigned it = 0; it < countof(hpkp_data); it++) {
 		const struct hpkp_data *t = &hpkp_data[it];
 
@@ -1352,7 +1352,7 @@ static void test_hpkp(void)
 			ok++;
 		else {
 			failed++;
-			info_printf("Failed [%u]: wget_hpkp_check_pubkey(%s,%s) -> %d (expected %d)\n", it, t->host, t->pubkey, n, t->result);
+			info_printf("Failed [%u]: wget_hpkp_db_check_pubkey(%s,%s) -> %d (expected %d)\n", it, t->host, t->pubkey, n, t->result);
 		}
 	}
 
