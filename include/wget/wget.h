@@ -1854,6 +1854,16 @@ typedef struct ROBOTS {
 		*paths;
 	wget_vector_t
 		*sitemaps;
+	wget_vector_t
+		*apaths;
+	wget_vector_t
+		*crawl_delay;
+	wget_vector_t
+		*hosts;
+	wget_vector_t
+		*params;
+	wget_vector_t
+		*cpaths;
 } ROBOTS;
 
 WGETAPI ROBOTS *

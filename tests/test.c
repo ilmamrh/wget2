@@ -1950,19 +1950,31 @@ static void test_robots(void)
 			path[3];
 		const char *
 			sitemap[3];
+		/* const char * */
+		/* 	crawl_delay[3]; */
+		/* const char * */
+		/* 	host[3]; */
+		/* const char * */
+		/* 	clean_param[3]; */
 	} test_data[] = {
 		{
 			// Deny all robots from part of the server
 			"User-agent: *\n"
 			"Disallow: /cgi-bin/\n",
 			{ "/cgi-bin/", NULL },
-			{ "", NULL }
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
+			{ NULL }
 		},
 		{
 			// Deny all robots from the entire server
 			"User-agent: *\n"
 			"Disallow: /\n",
 			{ "/", NULL },
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
 			{ NULL }
 		},
 		{
@@ -1970,6 +1982,9 @@ static void test_robots(void)
 			"User-agent: wget2\n"
 			"Disallow: /cgi-bin/\n",
 			{ "/cgi-bin/", NULL },
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
 			{ NULL }
 		},
 		{
@@ -1977,6 +1992,9 @@ static void test_robots(void)
 			"User-agent: wget2\n"
 			"Disallow: /\n",
 			{ "/", NULL },
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
 			{ NULL }
 		},
 		{
@@ -1986,6 +2004,9 @@ static void test_robots(void)
 			"User-agent: wget2\n"
 			"Disallow: \n",
 			{ "/", NULL },
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
 			{ NULL }
 		},
 		{
@@ -1993,6 +2014,9 @@ static void test_robots(void)
 			// or simply don't use a robots.txt at all
 			"User-agent: *\n"
 			"Disallow: \n",
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL }, */
 			{ NULL },
 			{ NULL }
 		},
@@ -2003,6 +2027,9 @@ static void test_robots(void)
 			"Sitemap: http://www.example.com/sitemap.xml",
 			{ "/cgi-bin/", NULL },
 			{ "http://www.example.com/sitemap.xml", NULL }
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL } */
 		},
 		{
 			// with 2 sitemap
@@ -2012,6 +2039,9 @@ static void test_robots(void)
 			"Sitemap: http://www.example2.com/sitemap.xml",
 			{ "/cgi-bin/", NULL },
 			{ "http://www.example1.com/sitemap.xml", "http://www.example2.com/sitemap.xml", NULL }
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL } */
 		},
 		{
 			// with 2 "Disallow" entries
@@ -2022,6 +2052,9 @@ static void test_robots(void)
 			"Sitemap: http://www.example2.com/sitemap.xml",
 			{ "/cgi-bin/", "/tmp/", NULL },
 			{ "http://www.example1.com/sitemap.xml", "http://www.example2.com/sitemap.xml", NULL }
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL } */
 		},
 		{
 			// with equal number entries
@@ -2034,21 +2067,45 @@ static void test_robots(void)
 			"Sitemap: http://www.example3.com/sitemap.xml",
 			{ "/cgi-bin/", "/tmp/", "/junk/" },
 			{ "http://www.example1.com/sitemap.xml", "http://www.example2.com/sitemap.xml", "http://www.example3.com/sitemap.xml" }
-		},
-		{
-			// null termination test
-			"User-agent: *\n"
-			"Disallow: /cgi-bin/",
-			{ "/cgi-bin/", NULL },
-			{ "", NULL }
-		},
-		{
-			// null termination test #2
-			"User-agent: *"
-			"Disallow: /cgi-bin/",
-			{ "/cgi-bin/", NULL },
-			{ "", NULL }
+			/* { NULL }, */
+			/* { NULL }, */
+			/* { NULL } */
 		}
+		/* { */
+		/* 	// using crawl-delay */
+		/* 	"User-agent: *\n" */
+		/* 	"Disallow: /cgi-bin/\n" */
+		/* 	"Crawl-delay: 1", */
+		/* 	{ "/cgi-bin/", NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ "1", NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ NULL } */
+		/* }, */
+		/* { */
+		/* 	// using host */
+		/* 	"User-agent: *\n" */
+		/* 	"Disallow: /cgi-bin/\n" */
+		/* 	"Host: www.themirror.com", */
+		/* 	{ "/cgi-bin/", NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ "www.themirror.com", NULL }, */
+		/* 	{ NULL } */
+		/* }, */
+		/* { */
+		/* 	// using clean-param */
+		/* 	"User-agent: *\n" */
+		/* 	"Disallow: /cgi-bin/\n" */
+		/* 	"Clean-param: s /form/index.php", */
+		/* 	{ "/cgi-bin/", NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ NULL }, */
+		/* 	{ */
+		/* 		NULL */
+		/* 	} */
+		/* } */
 	};
 
 	for (unsigned it = 0; it < countof(test_data); it++) {
@@ -2084,6 +2141,21 @@ static void test_robots(void)
 				}
 			}
 		}
+
+		/* for (unsigned it2 = 0; it2 < countof(test_data[it].crawl_delay) && t->crawl_delay[it2]; it2++) { */
+		/* 	int n = wget_vector_size(robots->crawl_delay); */
+		/* 	for (int it3 = 0; it3 < n; it3++) { */
+		/* 		const char *crawl_delay = wget_vector_get(robots->crawl_delay, it3); */
+		/* 		if (!strcmp(crawl_delay, t->crawl_delay[it2])) { */
+		/* 			info_printf("Found Crawl-delay: \"%s\" on robots\n", t->crawl_delay[it2]); */
+		/* 			it3 = n; */
+		/* 			ok++; */
+		/* 		} else if ((strcmp(crawl_delay, t->crawl_delay[it2]) && it3 == n - 1)) { */
+		/* 			info_printf("Cannot find Crawl-delay: \"%s\" on robots\n", t->crawl_delay[it2]); */
+		/* 			failed++; */
+		/* 		} */
+		/* 	} */
+		/* } */
 
 		wget_robots_free(&robots);
 

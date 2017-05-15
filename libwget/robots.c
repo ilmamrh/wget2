@@ -103,6 +103,14 @@ ROBOTS *wget_robots_parse(const char *data, const char *client)
 				wget_vector_add(robots->paths, &path, sizeof(path));
 			}
 		}
+		/* else if (!wget_strncasecmp_ascii(data, "Allow:", 6)) { */
+		/* 	for (data += 6; *data==' ' || *data == '\t'; data++); */
+		/* 	for (p = data; *p && !isspace(*p); p++); */
+
+		/* 	if (!robots->apaths) */
+		/* 		robots->apaths = wget_vector_create(4, -2, NULL); */
+		/* 	wget_vector_add_noalloc(robots->paths, wget_strmemdup(data, p - data)); */
+		/* } */
 		else if (!wget_strncasecmp_ascii(data, "Sitemap:", 8)) {
 			for (data += 8; *data==' ' || *data == '\t'; data++);
 			for (p = data; *p && !isspace(*p); p++);
@@ -111,7 +119,37 @@ ROBOTS *wget_robots_parse(const char *data, const char *client)
 				robots->sitemaps = wget_vector_create(4, -2, NULL);
 			wget_vector_add_noalloc(robots->sitemaps, wget_strmemdup(data, p - data));
 		}
+		/* else if (!wget_strncasecmp_ascii(data, "Crawl-delay:", 12)) { */
+		/* 	for (data += 12; *data==' ' || *data == '\t'; data++); */
+		/* 	for (p = data; *p && !isspace(*p); p++); */
 
+		/* 	if (!robots->crawl_delay) */
+		/* 		robots->crawl_delay = wget_vector_create(4, -2, NULL); */
+		/* 	wget_vector_add_noalloc(robots->crawl_delay, wget_strmemdup(data, p - data)); */
+		/* } */
+		/* else if (!wget_strncasecmp_ascii(data, "Host:", 5)) { */
+		/* 	for (data += 5; *data==' ' || *data == '\t'; data++); */
+		/* 	for (p = data; *p && !isspace(*p); p++); */
+
+		/* 	if (!robots->hosts) */
+		/* 		robots->hosts = wget_vector_create(4, -2, NULL); */
+		/* 	wget_vector_add_noalloc(robots->hosts, wget_strmemdup(data, p - data)); */
+		/* } */
+		/* else if (!wget_strncasecmp_ascii(data, "Clean-param:", 12)) { */
+		/* 	for (data += 12; *data==' ' || *data == '\t'; data++); */
+		/* 	for (p = data; *p && !isspace(*p); p++); */
+
+		/* 	if (!robots->params) */
+		/* 		robots->params = wget_vector_create(4, -2, NULL); */
+		/* 	wget_vector_add_noalloc(robots->params, wget_strmemdup(data, p - data)); */
+
+		/* 	for (data += 1; *data==' ' || *data == '\t'; data++); */
+		/* 	for (p = data; *p && !isspace(*p); p++); */
+
+		/* 	if (!robots->cpaths) */
+		/* 		robots->cpaths = wget_vector_create(4, -2, NULL); */
+		/* 	wget_vector_add_noalloc(robots->cpaths, wget_strmemdup(data, p - data)); */
+		/* } */
 		if ((data = strchr(data, '\n')))
 			data++; // point to next line
 	} while (data && *data);
@@ -140,6 +178,10 @@ void wget_robots_free(ROBOTS **robots)
 	if (robots && *robots) {
 		wget_vector_free(&(*robots)->paths);
 		wget_vector_free(&(*robots)->sitemaps);
+		/* wget_vector_free(&(*robots)->crawl_delay); */
+		/* wget_vector_free(&(*robots)->hosts); */
+		/* wget_vector_free(&(*robots)->params); */
+		/* wget_vector_free(&(*robots)->cpaths); */
 		xfree(*robots);
 		*robots = NULL;
 	}
