@@ -245,6 +245,22 @@ if test "$gl_cc_sanitize_tsan" = yes; then
 fi
 
 #
+# libmicrohttpd
+#
+have_microhttpd=no
+if test "x$have_microhttpd" = xno; then
+  PKG_CHECK_MODULES(MICROHTTPD, [libmicrohttpd],
+    [AC_DEFINE([HAVE_MICROHTTPD], 1, [Define if microhttpd is available])
+     have_microhttpd=yes],
+    [have_microhttpd=no])
+  if test "x$have_microhttpd" = xno; then
+      AC_MSG_ERROR([*** microhttpd support required but libraries not found])
+  else
+	  HAVE_MICROHTTPD="yes"
+  fi
+fi
+
+#
 # Assertions
 #
 AC_ARG_ENABLE([assert],
@@ -557,6 +573,7 @@ AC_MSG_NOTICE([Summary of build options:
   CFlags:             ${CFLAGS} ${CPPFLAGS} ${WARN_CFLAGS}
   LDFlags:            ${LDFLAGS}
   Libs:               ${LIBS}
+  Microhttpd support: $HAVE_MICROHTTPD
   SSL/TLS support:    $with_gnutls
   GZIP compression:   $with_zlib
   BZIP2 compression:  $with_bzip2
