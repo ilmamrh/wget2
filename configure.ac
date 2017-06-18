@@ -374,6 +374,24 @@ AC_LINK_IFELSE(
 
 PKG_PROG_PKG_CONFIG
 
+#
+# libmicrohttpd
+#
+have_microhttpd=no
+if test "x$have_microhttpd" = xno; then
+  PKG_CHECK_MODULES(MICROHTTPD, [libmicrohttpd],
+    [AC_DEFINE([HAVE_MICROHTTPD], 1, [Define if microhttpd is available])
+     have_microhttpd=yes
+     LIBS="$MICROHTTPD_LIBS $LIBS"
+     CFLAGS="$MICROHTTPD_CFLAGS $CFLAGS"],
+    [have_microhttpd=no])
+  if test "x$have_microhttpd" = xno; then
+      AC_MSG_ERROR([*** microhttpd support required but libraries not found])
+  else
+	  HAVE_MICROHTTPD="yes"
+  fi
+fi
+
 AC_ARG_WITH(gnutls, AS_HELP_STRING([--without-gnutls], [disable GNUTLS SSL support]), with_gnutls=$withval, with_gnutls=yes)
 AS_IF([test "x$with_gnutls" != "xno"], [
   PKG_CHECK_MODULES([GNUTLS], [gnutls], [
@@ -594,6 +612,7 @@ AC_MSG_NOTICE([Summary of build options:
   CFlags:             ${CFLAGS} ${CPPFLAGS} ${WARN_CFLAGS}
   LDFlags:            ${LDFLAGS}
   Libs:               ${LIBS}
+  Microhttpd support: $HAVE_MICROHTTPD
   SSL/TLS support:    $with_gnutls
   GZIP compression:   $with_zlib
   BZIP2 compression:  $with_bzip2

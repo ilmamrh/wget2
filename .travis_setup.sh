@@ -14,7 +14,9 @@ if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
 	brew install xz
 	brew install lbzip2
 	brew install lzip
+	brew install libmicrohttpd
 	brew link --force gettext
 elif [[ "$TRAVIS_OS_NAME" = "linux" ]]; then
+	sudo apt-get install libmicrohttpd-dev
 	pip install --user cpp-coveralls
 fi

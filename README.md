@@ -102,6 +102,7 @@ The following packages are needed to build the software
 
 * autotools (autoconf, autogen, automake, autopoint, libtool)
 * pkg-config >= 0.28 (recommended)
+* libmicrohttpd (for simulate http server which used by test suite)
 * doxygen (for creating the documentation)
 * gettext >= 0.18.1
 * libz >= 1.2.3 (the distribution may call the package zlib*, eg. zlib1g on Debian)

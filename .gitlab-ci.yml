@@ -34,6 +34,8 @@ variables:
 #  * ASan, UBSan, Msan
 #  * distcheck
 Debian GNU/Linux build:
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq libmicrohttpd-dev
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$DEBIAN_BUILD
   script:
     - ./bootstrap && touch .manywarnings
@@ -55,6 +57,8 @@ Debian GNU/Linux build:
       - tests/*.log
 
 clang/Fedora:
+  before_script:
+    - dnf -y install libmicrohttpd-devel
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
   script:
     - export CC=clang
@@ -107,6 +111,14 @@ pages:
     - master
 
 MinGW64:
+  before_script:
+  - dnf -y install wget
+  - wget http://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-0.9.55.tar.gz
+  - tar zxf libmicrohttpd-0.9.55.tar.gz && cd libmicrohttpd-0.9.55/
+  - mingw64-configure --prefix=/usr/x86_64-w64-mingw32/sys-root/mingw/
+  - mingw64-make -j$(nproc)
+  - mingw64-make -j$(nproc) LOG_COMPILER=wine install
+  - cd -
   image: $CI_REGISTRY/$BUILD_IMAGES_PROJECT:$FEDORA_BUILD
   script:
   - ./bootstrap
