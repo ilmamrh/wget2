@@ -312,22 +312,48 @@ static char *_parse_hostname(const char* data)
 		return NULL;
 }
 
+static char *_replace_space_with_plus(char *data)
+{
+	if (strchr(data, ' ') != 0) {
+		char *result = data;
+		char *wk, *s;
+	
+		wk = s = strdup(data);
+	
+		while (*s != 0) {
+			if (*s == ' '){
+				*data++ = '+';
+				++s;
+			} else
+				*data++ = *s++;
+		}
+		*data = '\0';
+		free(wk);
+		return result;
+	} else
+		return data;
+}
+
 static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 						const char *value)
 {
 	if (key && url_it == 0 && url_it2 == 0) {
 		wget_buffer_strcpy(url_arg, "?");
+		_replace_space_with_plus(key);
 		wget_buffer_strcat(url_arg, key);
 		if (value) {
 			wget_buffer_strcat(url_arg, "=");
+			_replace_space_with_plus(value);
 			wget_buffer_strcat(url_arg, value);
 		}
 	}
 	if (key && url_it != 0 && url_it2 == 0) {
 		wget_buffer_strcat(url_arg, "&");
+		_replace_space_with_plus(key);
 		wget_buffer_strcat(url_arg, key);
 		if (value) {
 			wget_buffer_strcat(url_arg, "=");
+			_replace_space_with_plus(value);
 			wget_buffer_strcat(url_arg, value);
 		}
 	}
