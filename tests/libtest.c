@@ -293,6 +293,16 @@ static char *_parse_header_transfer_encoding(const char* data)
 		return NULL;
 }
 
+static char *_scan_directory(const char* data)
+{
+	char *path = strchr(data, '/');
+	if (path != 0) {
+		return path;
+	}
+	else
+		return NULL;
+}
+
 static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 						const char *value)
 {
@@ -338,6 +348,10 @@ static int answer_to_connection (void *cls,
 
 	unsigned int itt, found = 0;
 	for (itt = 0; itt < nurls; itt++) {
+		char *dir = _scan_directory(url_full->data + 1);
+		if (dir != 0 && !strcmp(dir, "/"))
+			wget_buffer_strcat(url_full, "index.html");
+
 		if (!strcmp(urls[itt].code, "302 Redirect") && !strcmp(url_full->data, urls[itt].name)) {
 			response = MHD_create_response_from_buffer(strlen("302 Redirect"),
 					(void *) "302 Redirect", MHD_RESPMEM_PERSISTENT);
