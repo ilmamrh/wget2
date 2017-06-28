@@ -88,6 +88,10 @@ static const char
 	*server_hello;
 static char
 	server_send_content_length = 1;
+int
+	url_it, url_it2;
+wget_buffer_t
+	*url_arg;
 struct MHD_Daemon
 	*httpdaemon;
 
@@ -273,6 +277,29 @@ static char *_parse_header_content_type(const char* data)
 		return NULL;
 }
 
+static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
+						const char *value)
+{
+	if (key && url_it == 0 && url_it2 == 0) {
+		wget_buffer_strcpy(url_arg, "?");
+		wget_buffer_strcat(url_arg, key);
+		if (value) {
+			wget_buffer_strcat(url_arg, "=");
+			wget_buffer_strcat(url_arg, value);
+		}
+	}
+	if (key && url_it != 0 && url_it2 == 0) {
+		wget_buffer_strcat(url_arg, "&");
+		wget_buffer_strcat(url_arg, key);
+		if (value) {
+			wget_buffer_strcat(url_arg, "=");
+			wget_buffer_strcat(url_arg, value);
+		}
+	}
+	url_it++;
+    return MHD_YES;
+}
+
 static int answer_to_connection (void *cls,
 					struct MHD_Connection *connection,
 					const char *url,
@@ -283,9 +310,19 @@ static int answer_to_connection (void *cls,
 	struct MHD_Response *response;
 	int ret;
 
+	url_arg = wget_buffer_alloc(1024);
+	MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, print_out_key, NULL);
+
+	url_it2 = url_it;
+	wget_buffer_t *url_full = wget_buffer_alloc(1024);
+	wget_buffer_strcpy(url_full, url);
+	if (url_arg)
+		wget_buffer_strcat(url_full, url_arg->data);
+	url_it = url_it2 = 0;
+
 	unsigned int itt, found = 0;
 	for (itt = 0; itt < nurls; itt++) {
-		if (!strcmp(url, urls[itt].name)) {
+		if (!strcmp(url_full->data, urls[itt].name)) {
 			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
 					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
 			if (urls[itt].headers && *urls[itt].headers) {
