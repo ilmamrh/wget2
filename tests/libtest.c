@@ -49,6 +49,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <microhttpd.h>
+#include <netdb.h>
 
 static wget_thread_t
 	http_server_tid,
@@ -311,12 +312,55 @@ void _http_server_stop()
 
 int _http_server_start()
 {
-	httpdaemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY | MHD_USE_ERROR_LOG,
-				http_server_port, NULL, NULL, &answer_to_connection, NULL, NULL,
+	int port_num = 0;
+
+	httpdaemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,
+				port_num, NULL, NULL, &answer_to_connection, NULL, NULL,
 				MHD_OPTION_END);
 
 	if (!httpdaemon)
 		return 1;
+
+	// get open random port number
+	if(0) {}
+#if MHD_VERSION >= 0x00095501
+	else if (MHD_NO != MHD_is_feature_supported(MHD_FEATURE_AUTODETECT_BIND_PORT))
+	{
+		const union MHD_DaemonInfo *dinfo;
+		dinfo = MHD_get_daemon_info(httpdaemon, MHD_DAEMON_INFO_BIND_PORT);
+		if (NULL == dinfo || 0 == dinfo->port)
+		{
+			return 1;
+		}
+		port_num = (int)dinfo->port;
+		http_server_port = port_num;
+	}
+#endif /* MHD_VERSION >= 0x00095501 */
+	else
+	{
+		const union MHD_DaemonInfo *dinfo;
+		MHD_socket sock_fd;
+		dinfo = MHD_get_daemon_info(httpdaemon, MHD_DAEMON_INFO_LISTEN_FD);
+		if (NULL == dinfo)
+		{
+			return 1;
+		}
+		sock_fd = dinfo->listen_fd;
+
+		struct sockaddr_storage addr_store;
+		struct sockaddr *addr = (struct sockaddr *)&addr_store;
+		socklen_t addr_len = sizeof(addr_store);
+		char s_port[NI_MAXSERV];
+
+		// get automatic retrieved port number
+		if (getsockname(sock_fd, addr, &addr_len)==0) {
+			if (getnameinfo(addr, addr_len, NULL, 0, s_port, sizeof(s_port), NI_NUMERICSERV)    ==0)
+				port_num = atoi(s_port);
+				http_server_port = port_num;
+		}
+
+	}
+
 
 	return 0;
 }
@@ -693,12 +737,6 @@ void wget_test_start_server(int first_key, ...)
 	wget_ssl_set_config_string(WGET_SSL_CA_FILE, SRCDIR "/certs/x509-ca-cert.pem");
 	wget_ssl_set_config_string(WGET_SSL_CERT_FILE, SRCDIR "/certs/x509-server-cert.pem");
 	wget_ssl_set_config_string(WGET_SSL_KEY_FILE, SRCDIR "/certs/x509-server-key.pem");
-
-	// init HTTPS server socket
-	http_parent_tcp = wget_tcp_init();
-	if (wget_tcp_listen(http_parent_tcp, "localhost", NULL, 5) != 0)
-		exit(1);
-	http_server_port = 44444;
 
 	// init HTTPS server socket
 	https_parent_tcp = wget_tcp_init();
