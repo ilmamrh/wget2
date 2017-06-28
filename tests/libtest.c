@@ -352,7 +352,11 @@ static int answer_to_connection (void *cls,
 		if (dir != 0 && !strcmp(dir, "/"))
 			wget_buffer_strcat(url_full, "index.html");
 
-		if (!strcmp(urls[itt].code, "302 Redirect") && !strcmp(url_full->data, urls[itt].name)) {
+		wget_buffer_t *iri_url = wget_buffer_alloc(1024);
+		wget_buffer_strcpy(iri_url, urls[itt].name);
+		MHD_http_unescape(iri_url->data);
+
+		if (!strcmp(urls[itt].code, "302 Redirect") && !strcmp(url_full->data, iri_url->data)) {
 			response = MHD_create_response_from_buffer(strlen("302 Redirect"),
 					(void *) "302 Redirect", MHD_RESPMEM_PERSISTENT);
 			if (_parse_header_location(urls[itt].headers[0])) {
@@ -364,7 +368,7 @@ static int answer_to_connection (void *cls,
 			} else {
 				itt = nurls;
 			}
-		} else if (!strcmp(url_full->data, urls[itt].name)) {
+		} else if (!strcmp(url_full->data, iri_url->data)) {
 			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
 					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
 			for (unsigned int itt2 = 0; urls[itt].headers[itt2] != NULL; itt2++) {
@@ -383,12 +387,15 @@ static int answer_to_connection (void *cls,
 			itt = nurls;
 			found = 1;
 		}
+		wget_buffer_free(&iri_url);
 	}
 	if (found == 0) {
 		response = MHD_create_response_from_buffer(strlen("404 Not Found"),
 			(void *) "404 Not Found", MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
 	}
+	wget_buffer_free(&url_arg);
+	wget_buffer_free(&url_full);
 	MHD_destroy_response(response);
 	return ret;
 }
