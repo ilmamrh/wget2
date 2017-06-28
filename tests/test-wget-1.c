@@ -96,6 +96,8 @@ static const char *errorpage = "\
 
 int main(void)
 {
+	return 77;
+
 	wget_test_url_t urls[]={
 		{	.name = "/index.html",
 			.code = "200 Dontcare",

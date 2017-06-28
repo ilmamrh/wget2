@@ -94,6 +94,8 @@ wget_buffer_t
 	*url_arg;
 struct MHD_Daemon
 	*httpdaemon;
+int _http_server_start(void);
+void _http_server_stop(void);
 
 static void sigterm_handler(int sig G_GNUC_WGET_UNUSED)
 {
@@ -269,30 +271,6 @@ static void *_http_server_thread(void *ctx)
 	return NULL;
 }
 
-static char *_parse_header_content_type(const char* data)
-{
-	if (!wget_strncasecmp_ascii(data, "Content-Type:", 13)) {
-		return data += 13;
-	} else
-		return NULL;
-}
-
-static char *_parse_header_location(const char* data)
-{
-	if (!wget_strncasecmp_ascii(data, "Location:", 9)) {
-		return data += 9;
-	} else
-		return NULL;
-}
-
-static char *_parse_header_transfer_encoding(const char* data)
-{
-	if (!wget_strncasecmp_ascii(data, "Transfer-Encoding:", 18)) {
-		return data += 18;
-	} else
-		return NULL;
-}
-
 static char *_scan_directory(const char* data)
 {
 	char *path = strchr(data, '/');
@@ -317,9 +295,9 @@ static char *_replace_space_with_plus(char *data)
 	if (strchr(data, ' ') != 0) {
 		char *result = data;
 		char *wk, *s;
-	
+
 		wk = s = strdup(data);
-	
+
 		while (*s != 0) {
 			if (*s == ' '){
 				*data++ = '+';
@@ -339,21 +317,21 @@ static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 {
 	if (key && url_it == 0 && url_it2 == 0) {
 		wget_buffer_strcpy(url_arg, "?");
-		_replace_space_with_plus(key);
+		_replace_space_with_plus((char *) key);
 		wget_buffer_strcat(url_arg, key);
 		if (value) {
 			wget_buffer_strcat(url_arg, "=");
-			_replace_space_with_plus(value);
+			_replace_space_with_plus((char *) value);
 			wget_buffer_strcat(url_arg, value);
 		}
 	}
 	if (key && url_it != 0 && url_it2 == 0) {
 		wget_buffer_strcat(url_arg, "&");
-		_replace_space_with_plus(key);
+		_replace_space_with_plus((char *) key);
 		wget_buffer_strcat(url_arg, key);
 		if (value) {
 			wget_buffer_strcat(url_arg, "=");
-			_replace_space_with_plus(value);
+			_replace_space_with_plus((char *) value);
 			wget_buffer_strcat(url_arg, value);
 		}
 	}
@@ -397,33 +375,43 @@ static int answer_to_connection (void *cls,
 		wget_buffer_strcpy(iri_url, urls[itt].name);
 		MHD_http_unescape(iri_url->data);
 
-		if (!strcmp(urls[itt].code, "302 Redirect") && !strcmp(url_full->data, iri_url->data)) {
+		if (urls[itt].code != NULL &&
+			!strcmp(urls[itt].code, "302 Redirect") &&
+			!strcmp(url_full->data, iri_url->data))
+		{
 			response = MHD_create_response_from_buffer(strlen("302 Redirect"),
 					(void *) "302 Redirect", MHD_RESPMEM_PERSISTENT);
-			if (_parse_header_location(urls[itt].headers[0])) {
-				MHD_add_response_header(response, "Location",
-										_parse_header_location(urls[itt].headers[0]));
-				ret = MHD_queue_response(connection, MHD_HTTP_FOUND, response);
-				itt = nurls;
-				found = 1;
-			} else {
-				itt = nurls;
+			for (int itt2 = 0; urls[itt].headers[itt2] != NULL; itt2++) {
+				const char *header = urls[itt].headers[itt2];
+				if (header) {
+					char *header_value = strchr(header, ':');
+					char *header_key = wget_strmemdup(header, header_value - header);
+					MHD_add_response_header(response, header_key, header_value + 2);
+					ret = MHD_queue_response(connection, MHD_HTTP_FOUND, response);
+					wget_xfree(header_key);
+					itt = nurls;
+					found = 1;
+				} else
+					itt = nurls;
 			}
 		} else if (!strcmp(url_full->data, iri_url->data)) {
 			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
 					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
-			for (unsigned int itt2 = 0; urls[itt].headers[itt2] != NULL; itt2++) {
-					if (_parse_header_content_type(urls[itt].headers[itt2])) {
-						MHD_add_response_header(response, "Content-Type",
-												_parse_header_content_type(urls[itt].headers[itt2]));
-					}
-					if (_parse_header_transfer_encoding(urls[itt].headers[itt2])) {
-						MHD_add_response_header(response, "Transfer-Encoding",
-												_parse_header_transfer_encoding(urls[itt].headers[itt2]));
-						MHD_add_response_header(response, "Connection", "close");
+			if (urls[itt].headers && *urls[itt].headers) {
+				for (int itt2 = 0; urls[itt].headers[itt2] != NULL; itt2++) {
+					const char *header = urls[itt].headers[itt2];
+					if (header) {
+						char *header_value = strchr(header, ':');
+						char *header_key = wget_strmemdup(header, header_value - header);
+						if (!strcmp(header_key, "Transfer-Encoding")) {
+							MHD_add_response_header(response, header_key, header_value + 2);
+							MHD_add_response_header(response, "Connection", "close");
+						} else
+							MHD_add_response_header(response, header_key, header_value + 2);
+						wget_xfree(header_key);
 					}
 				}
-
+			}
 			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 			itt = nurls;
 			found = 1;
@@ -441,12 +429,12 @@ static int answer_to_connection (void *cls,
 	return ret;
 }
 
-void _http_server_stop()
+void _http_server_stop(void)
 {
 	MHD_stop_daemon(httpdaemon);
 }
 
-int _http_server_start()
+int _http_server_start(void)
 {
 	int port_num = 0;
 
@@ -716,7 +704,7 @@ void wget_test_stop_server(void)
 //	if (ftps_implicit)
 //		pthread_kill(ftps_server_tid, SIGTERM);
 
-	wget_thread_cancel(http_server_tid);
+//	wget_thread_cancel(http_server_tid);
 	wget_thread_cancel(https_server_tid);
 	wget_thread_cancel(ftp_server_tid);
 	if (ftps_implicit)
@@ -734,7 +722,7 @@ void wget_test_stop_server(void)
 		_remove_directory(tmpdir);
 
 	wget_global_deinit();
-	_http_server_stop;
+	_http_server_stop();
 	wget_info_printf("[SERVER] stopped...\n");
 }
 
@@ -794,7 +782,7 @@ static void _write_msg(const char *msg, size_t len)
 
 void wget_test_start_server(int first_key, ...)
 {
-	static wget_tcp_t *http_parent_tcp, *https_parent_tcp, *ftp_parent_tcp, *ftps_parent_tcp;
+	static wget_tcp_t *https_parent_tcp, *ftp_parent_tcp, *ftps_parent_tcp;
 	int rc, key;
 	size_t it;
 	va_list args;
@@ -1119,7 +1107,7 @@ void wget_test(int first_key, ...)
 		else
 			wget_buffer_printf(cmd, "%s %s", executable, options);
 	} else if (!strcmp(valgrind, "1")) {
-		wget_buffer_printf(cmd, "valgrind --error-exitcode=301 --leak-check=yes --show-reachable=yes --track-origins=yes --suppressions=" SRCDIR "/valgrind-suppressions %s %s", executable, options);
+		wget_buffer_printf(cmd, "valgrind -v --error-exitcode=301 --leak-check=yes --show-reachable=yes --track-origins=yes --suppressions=" SRCDIR "/valgrind-suppressions %s %s", executable, options);
 	} else
 		wget_buffer_printf(cmd, "%s %s %s", valgrind, executable, options);
 

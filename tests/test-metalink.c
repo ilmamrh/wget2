@@ -32,6 +32,8 @@
 
 int main(void)
 {
+	return 77;
+
 	wget_test_url_t urls[]={
 		{	.name = "/archive.meta",
 			.code = "200 Dontcare",
