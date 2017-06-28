@@ -303,6 +303,15 @@ static char *_scan_directory(const char* data)
 		return NULL;
 }
 
+static char *_parse_hostname(const char* data)
+{
+	if (!wget_strncasecmp_ascii(data, "http://", 7)) {
+		char *path = strchr(data += 7, '/');
+		return path;
+	} else
+		return NULL;
+}
+
 static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 						const char *value)
 {
@@ -352,6 +361,10 @@ static int answer_to_connection (void *cls,
 	for (itt = 0; itt < nurls; itt++) {
 		char *dir = _scan_directory(url_full->data + 1);
 		if (dir != 0 && !strcmp(dir, "/"))
+			wget_buffer_strcat(url_full, "index.html");
+
+		char *host = _parse_hostname(url_full->data);
+		if (host != 0 && !strcmp(host, "/"))
 			wget_buffer_strcat(url_full, "index.html");
 
 		wget_buffer_t *iri_url = wget_buffer_alloc(1024);
