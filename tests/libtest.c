@@ -277,6 +277,14 @@ static char *_parse_header_content_type(const char* data)
 		return NULL;
 }
 
+static char *_parse_header_location(const char* data)
+{
+	if (!wget_strncasecmp_ascii(data, "Location:", 9)) {
+		return data += 9;
+	} else
+		return NULL;
+}
+
 static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 						const char *value)
 {
@@ -322,7 +330,19 @@ static int answer_to_connection (void *cls,
 
 	unsigned int itt, found = 0;
 	for (itt = 0; itt < nurls; itt++) {
-		if (!strcmp(url_full->data, urls[itt].name)) {
+		if (!strcmp(urls[itt].code, "302 Redirect") && !strcmp(url_full->data, urls[itt].name)) {
+			response = MHD_create_response_from_buffer(strlen("302 Redirect"),
+					(void *) "302 Redirect", MHD_RESPMEM_PERSISTENT);
+			if (_parse_header_location(urls[itt].headers[0])) {
+				MHD_add_response_header(response, "Location",
+										_parse_header_location(urls[itt].headers[0]));
+				ret = MHD_queue_response(connection, MHD_HTTP_FOUND, response);
+				itt = nurls;
+				found = 1;
+			} else {
+				itt = nurls;
+			}
+		} else if (!strcmp(url_full->data, urls[itt].name)) {
 			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
 					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
 			if (urls[itt].headers && *urls[itt].headers) {
@@ -333,7 +353,8 @@ static int answer_to_connection (void *cls,
 			itt = nurls;
 			found = 1;
 		}
-	} if (found == 0) {
+	}
+	if (found == 0) {
 		response = MHD_create_response_from_buffer(strlen("404 Not Found"),
 			(void *) "404 Not Found", MHD_RESPMEM_PERSISTENT);
 		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
