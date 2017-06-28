@@ -45,6 +45,11 @@
 #include <wget.h>
 #include "libtest.h"
 
+#include <sys/types.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <microhttpd.h>
+
 static wget_thread_t
 	http_server_tid,
 	https_server_tid,
@@ -82,6 +87,8 @@ static const char
 	*server_hello;
 static char
 	server_send_content_length = 1;
+struct MHD_Daemon
+	*httpdaemon;
 
 static void sigterm_handler(int sig G_GNUC_WGET_UNUSED)
 {
@@ -255,6 +262,63 @@ static void *_http_server_thread(void *ctx)
 
 	wget_info_printf("[SERVER] stopped\n");
 	return NULL;
+}
+
+static char *_parse_header_content_type(const char* data)
+{
+	if (!wget_strncasecmp_ascii(data, "Content-Type:", 13)) {
+		return data += 13;
+	} else
+		return NULL;
+}
+
+static int answer_to_connection (void *cls,
+					struct MHD_Connection *connection,
+					const char *url,
+					const char *method,
+					const char *version,
+					const char *upload_data, size_t *upload_data_size, void **con_cls)
+{
+	struct MHD_Response *response;
+	int ret;
+
+	unsigned int itt, found = 0;
+	for (itt = 0; itt < nurls; itt++) {
+		if (!strcmp(url, urls[itt].name)) {
+			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
+					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
+			if (urls[itt].headers && *urls[itt].headers) {
+				MHD_add_response_header(response, "Content-Type",
+										_parse_header_content_type(urls[itt].headers[0]));
+			}
+			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+			itt = nurls;
+			found = 1;
+		}
+	} if (found == 0) {
+		response = MHD_create_response_from_buffer(strlen("404 Not Found"),
+			(void *) "404 Not Found", MHD_RESPMEM_PERSISTENT);
+		ret = MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
+	}
+	MHD_destroy_response(response);
+	return ret;
+}
+
+void _http_server_stop()
+{
+	MHD_stop_daemon(httpdaemon);
+}
+
+int _http_server_start()
+{
+	httpdaemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY | MHD_USE_ERROR_LOG,
+				http_server_port, NULL, NULL, &answer_to_connection, NULL, NULL,
+				MHD_OPTION_END);
+
+	if (!httpdaemon)
+		return 1;
+
+	return 0;
 }
 
 static void *_ftp_server_thread(void *ctx)
@@ -490,6 +554,8 @@ void wget_test_stop_server(void)
 		_remove_directory(tmpdir);
 
 	wget_global_deinit();
+	_http_server_stop;
+	wget_info_printf("[SERVER] stopped...\n");
 }
 
 static char *_insert_ports(const char *src)
@@ -628,13 +694,11 @@ void wget_test_start_server(int first_key, ...)
 	wget_ssl_set_config_string(WGET_SSL_CERT_FILE, SRCDIR "/certs/x509-server-cert.pem");
 	wget_ssl_set_config_string(WGET_SSL_KEY_FILE, SRCDIR "/certs/x509-server-key.pem");
 
-	// init HTTP server socket
+	// init HTTPS server socket
 	http_parent_tcp = wget_tcp_init();
-	wget_tcp_set_timeout(http_parent_tcp, -1); // INFINITE timeout
-	wget_tcp_set_preferred_family(http_parent_tcp, WGET_NET_FAMILY_IPV4); // to have a defined order of IPs
 	if (wget_tcp_listen(http_parent_tcp, "localhost", NULL, 5) != 0)
 		exit(1);
-	http_server_port = wget_tcp_get_local_port(http_parent_tcp);
+	http_server_port = 44444;
 
 	// init HTTPS server socket
 	https_parent_tcp = wget_tcp_init();
@@ -664,6 +728,10 @@ void wget_test_start_server(int first_key, ...)
 		ftps_server_port = wget_tcp_get_local_port(ftps_parent_tcp);
 	}
 
+	// start HTTP server
+	if ((rc = _http_server_start()) != 0)
+		wget_error_printf_exit(_("Failed to start HTTP server, error %d\n"), rc);
+
 	// now replace {{port}} in the body by the actual server port
 	for (wget_test_url_t *url = urls; url < urls + nurls; url++) {
 		char *p = _insert_ports(url->body);
@@ -682,10 +750,6 @@ void wget_test_start_server(int first_key, ...)
 			}
 		}
 	}
-
-	// start thread for HTTP
-	if ((rc = wget_thread_start(&http_server_tid, _http_server_thread, http_parent_tcp, 0)) != 0)
-		wget_error_printf_exit(_("Failed to start HTTP server, error %d\n"), rc);
 
 	// start thread for HTTPS
 	if ((rc = wget_thread_start(&https_server_tid, _http_server_thread, https_parent_tcp, 0)) != 0)
