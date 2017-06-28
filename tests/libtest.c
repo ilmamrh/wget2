@@ -344,6 +344,8 @@ static int answer_to_connection (void *cls,
 	wget_buffer_strcpy(url_full, url);
 	if (url_arg)
 		wget_buffer_strcat(url_full, url_arg->data);
+	if (!strcmp(url_full->data, "/"))
+		wget_buffer_strcat(url_full, "index.html");
 	url_it = url_it2 = 0;
 
 	unsigned int itt, found = 0;
