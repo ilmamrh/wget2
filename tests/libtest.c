@@ -285,6 +285,14 @@ static char *_parse_header_location(const char* data)
 		return NULL;
 }
 
+static char *_parse_header_transfer_encoding(const char* data)
+{
+	if (!wget_strncasecmp_ascii(data, "Transfer-Encoding:", 18)) {
+		return data += 18;
+	} else
+		return NULL;
+}
+
 static int print_out_key(void *cls, enum MHD_ValueKind kind, const char *key,
 						const char *value)
 {
@@ -345,10 +353,18 @@ static int answer_to_connection (void *cls,
 		} else if (!strcmp(url_full->data, urls[itt].name)) {
 			response = MHD_create_response_from_buffer(strlen(urls[itt].body),
 					(void *) urls[itt].body, MHD_RESPMEM_PERSISTENT);
-			if (urls[itt].headers && *urls[itt].headers) {
-				MHD_add_response_header(response, "Content-Type",
-										_parse_header_content_type(urls[itt].headers[0]));
-			}
+			for (unsigned int itt2 = 0; urls[itt].headers[itt2] != NULL; itt2++) {
+					if (_parse_header_content_type(urls[itt].headers[itt2])) {
+						MHD_add_response_header(response, "Content-Type",
+												_parse_header_content_type(urls[itt].headers[itt2]));
+					}
+					if (_parse_header_transfer_encoding(urls[itt].headers[itt2])) {
+						MHD_add_response_header(response, "Transfer-Encoding",
+												_parse_header_transfer_encoding(urls[itt].headers[itt2]));
+						MHD_add_response_header(response, "Connection", "close");
+					}
+				}
+
 			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 			itt = nurls;
 			found = 1;
