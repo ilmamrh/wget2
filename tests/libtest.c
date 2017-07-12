@@ -54,7 +54,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-
 static wget_thread_t
 	https_server_tid,
 	ftp_server_tid,
@@ -350,6 +349,21 @@ static int _print_header_range(void *cls, enum MHD_ValueKind kind,
 	return MHD_YES;
 }
 
+static int _print_authorization(void *cls, enum MHD_ValueKind kind,
+							const char *key,
+							const char *value)
+{
+	wget_buffer_t *authorization = cls;
+
+	if (!strcmp(key, "Authorization")) {
+		if (value) {
+			wget_buffer_strcpy(authorization, value);
+		}
+	}
+
+	return MHD_YES;
+}
+
 static int _answer_to_connection(void *cls,
 					struct MHD_Connection *connection,
 					const char *url,
@@ -359,7 +373,7 @@ static int _answer_to_connection(void *cls,
 {
 	struct MHD_Response *response;
 	struct query_string query;
-	int ret;
+	int ret, authorized;
 	time_t modified;
 	const char *modified_val, *to_bytes_string;
 	ssize_t from_bytes, to_bytes;
@@ -370,6 +384,12 @@ static int _answer_to_connection(void *cls,
 	query.params = wget_buffer_alloc(1024);
 	query.it = 0;
 	MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND, &_print_query_string, &query);
+
+	// get basic auth token
+	authorized = 0;
+	wget_buffer_t *authorization = wget_buffer_alloc(1024);
+	if (!strcmp(method, "GET"))
+		MHD_get_connection_values(connection, MHD_HEADER_KIND, &_print_authorization, authorization);
 
 	// get if-modified-since header
 	modified_val = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
@@ -453,8 +473,42 @@ static int _answer_to_connection(void *cls,
 					}
 				}
 				ret = MHD_queue_response(connection, MHD_HTTP_FOUND, response);
+				wget_buffer_free(&url_iri);
 				found = 1;
 				break;
+			}
+
+			if (urls[it1].auth_method != NULL)
+			{
+				if (*authorization->data) {
+						char *pass = NULL;
+						char *user = MHD_basic_auth_get_username_password(connection, &pass);
+						authorized = ((!strcmp(user, urls[it1].auth_username)) &&
+									!(strcmp(pass, urls[it1].auth_password)));
+
+						if (*user)
+							free(user);
+						if (*pass)
+							free(pass);
+				} else if ((!*authorization->data) && (authorized == 0)) {
+					if (!wget_strcasecmp_ascii(urls[it1].auth_method, "basic")) {
+						response = MHD_create_response_from_buffer(strlen ("DENIED"),
+								(void *) "DENIED", MHD_RESPMEM_PERSISTENT);
+				        ret = MHD_queue_basic_auth_fail_response(connection, "Protected Page", response);
+						wget_buffer_free(&url_iri);
+						found = 1;
+						break;
+					} else
+						wget_error_printf(_("Unknown authentication scheme '%s'\n"), urls[it1].auth_method);
+				}
+
+				if (authorized == 0) {
+					response = MHD_create_response_from_buffer(0, (void *) "", MHD_RESPMEM_PERSISTENT);
+					ret = MHD_queue_response(connection, MHD_HTTP_UNAUTHORIZED, response);
+					wget_buffer_free(&url_iri);
+					found = 1;
+					break;
+				}
 			}
 
 			if (modified && urls[it1].modified <= modified) {
@@ -519,6 +573,7 @@ static int _answer_to_connection(void *cls,
 
 	wget_buffer_free(&url_full);
 	wget_buffer_free(&header_range);
+	wget_buffer_free(&authorization);
 	MHD_destroy_response(response);
 	return ret;
 }

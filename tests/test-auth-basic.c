@@ -84,5 +84,15 @@ int main(void)
 			{ NULL } },
 		0);
 
+	// wrong credentials
+	wget_test(
+//		WGET_TEST_KEEP_TMPFILES, 1,
+		WGET_TEST_OPTIONS, "-d --user=" username " --password=\"whatever\"",
+		WGET_TEST_REQUEST_URL, urls[0].name + 1,
+		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
+			{	NULL } },
+		0);
+
 	exit(0);
 }
