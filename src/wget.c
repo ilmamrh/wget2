@@ -1317,7 +1317,7 @@ static int process_response_header(wget_http_response_t *resp)
 			return 1; // no challenges offered, stop further processing
 
 		job->challenges = resp->challenges;
-		job->challenges_alloc = true;
+		job->challenges_alloc = 1;
 
 		resp->challenges = NULL;
 		job->inuse = 0; // try again, but with challenge responses
