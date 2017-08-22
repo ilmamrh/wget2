@@ -1308,7 +1308,7 @@ static int process_response_header(wget_http_response_t *resp)
 		return 0; // 302 with Metalink information
 
 	if (resp->code == 401) { // Unauthorized
-		if (job->challenges && !job->challenges_alloc)
+		if (job->challenges)
 			return 0; // we already tried with credentials, they seem to be wrong. Don't try again.
 
 		// wget_http_free_challenges(&job->challenges);
@@ -1317,7 +1317,7 @@ static int process_response_header(wget_http_response_t *resp)
 			return 1; // no challenges offered, stop further processing
 
 		job->challenges = resp->challenges;
-		job->challenges_alloc = true;
+		job->challenges_alloc = 1;
 
 		resp->challenges = NULL;
 		job->inuse = 0; // try again, but with challenge responses
