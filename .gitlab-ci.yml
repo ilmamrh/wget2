@@ -147,7 +147,8 @@ MinGW64:
   - ./configure --build=x86_64-pc-linux-gnu --host=$PREFIX --enable-shared --enable-static
   - make clean
   - make -j$(nproc)
-  - make check -j$(nproc) LOG_COMPILER=wine
+  #- make check -j$(nproc) LOG_COMPILER=wine
+  - ./manual-test.sh
   tags:
   - shared
   - docker

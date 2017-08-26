@@ -506,8 +506,10 @@ static void add_url_to_queue(const char *url, wget_iri_t *base, const char *enco
 	if (config.spider || config.chunk_size)
 		new_job->head_first = 1;
 
-	if (config.auth_no_challenge)
+	if (config.auth_no_challenge) {
 		new_job->challenges = config.default_challenges;
+		new_job->challenges_alloc = 0;
+	}
 
 	host_add_job(host, new_job);
 
@@ -713,8 +715,10 @@ static void add_url(JOB *job, const char *encoding, const char *url, int flags)
 	if (config.spider || config.chunk_size)
 		new_job->head_first = 1;
 
-	if (config.auth_no_challenge)
+	if (config.auth_no_challenge) {
 		new_job->challenges = config.default_challenges;
+		new_job->challenges_alloc = 0;
+	}
 
 	// mark this job as a Sitemap job, but not if it is a robot.txt job
 	if (flags & URL_FLG_SITEMAP)
@@ -1313,6 +1317,7 @@ static int process_response_header(wget_http_response_t *resp)
 			return 1; // no challenges offered, stop further processing
 
 		job->challenges = resp->challenges;
+		job->challenges_alloc = true;
 
 		resp->challenges = NULL;
 		job->inuse = 0; // try again, but with challenge responses
