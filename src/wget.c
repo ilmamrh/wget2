@@ -119,6 +119,7 @@ static int
 	http_send_request(wget_iri_t *iri, wget_iri_t *original_url, DOWNLOADER *downloader);
 wget_http_response_t
 	*http_receive_response(wget_http_connection_t *conn);
+static long long G_GNUC_WGET_NONNULL_ALL get_file_size(const char *fname);
 
 static wget_stringmap_t
 	*etags;
@@ -131,15 +132,16 @@ static void
 static long long
 	quota;
 static int
-	exit_status,
 	hsts_changed,
 	hpkp_changed;
+static unsigned int
+	exit_status;
 static volatile int
 	terminate;
 int
 	nthreads;
 
-void set_exit_status(int status)
+void set_exit_status(exit_status_t status)
 {
 	// use Wget exit status scheme:
 	// - error code 0 is default
@@ -244,10 +246,9 @@ const char * G_GNUC_WGET_NONNULL_ALL get_local_filename(wget_iri_t *iri)
 			wget_buffer_strcat(&buf, iri->scheme);
 			wget_buffer_memcat(&buf, "/", 1);
 		}
-		if (config.host_directories && iri->host && *iri->host) {
+
+		if (config.host_directories && iri->host && *iri->host)
 			wget_buffer_strcat(&buf, iri->host);
-			wget_buffer_memcat(&buf, "/", 1);
-		}
 
 		if (config.cut_directories) {
 			// cut directories
@@ -506,10 +507,8 @@ static void add_url_to_queue(const char *url, wget_iri_t *base, const char *enco
 	if (config.spider || config.chunk_size)
 		new_job->head_first = 1;
 
-	if (config.auth_no_challenge) {
+	if (config.auth_no_challenge)
 		new_job->challenges = config.default_challenges;
-		new_job->challenges_alloc = 0;
-	}
 
 	host_add_job(host, new_job);
 
@@ -715,10 +714,8 @@ static void add_url(JOB *job, const char *encoding, const char *url, int flags)
 	if (config.spider || config.chunk_size)
 		new_job->head_first = 1;
 
-	if (config.auth_no_challenge) {
+	if (config.auth_no_challenge)
 		new_job->challenges = config.default_challenges;
-		new_job->challenges_alloc = 0;
-	}
 
 	// mark this job as a Sitemap job, but not if it is a robot.txt job
 	if (flags & URL_FLG_SITEMAP)
@@ -913,7 +910,7 @@ int main(int argc, const char **argv)
 
 	n = init(argc, argv);
 	if (n < 0) {
-		set_exit_status(1);
+		set_exit_status(WG_EXIT_STATUS_PARSE_INIT);
 		goto out;
 	}
 
@@ -1196,7 +1193,7 @@ static int establish_connection(DOWNLOADER *downloader, wget_iri_t **iri)
 			mirror_index = downloader->id % mirror_count;
 		else {
 			host_final_failure(downloader->job->host);
-			set_exit_status(1);
+			set_exit_status(WG_EXIT_STATUS_NETWORK);
 			return rc;
 		}
 
@@ -1229,7 +1226,7 @@ static int establish_connection(DOWNLOADER *downloader, wget_iri_t **iri)
 		// TLS  failure
 		wget_http_close(&downloader->conn);
 		host_final_failure(downloader->job->host);
-		set_exit_status(5);
+		set_exit_status(WG_EXIT_STATUS_TLS);
 	}
 
 	return rc;
@@ -1268,9 +1265,9 @@ static int process_response_header(wget_http_response_t *resp)
 	// Wget1.x compatibility
 	if (resp->code/100 == 4 && resp->code!=416) {
 		if (job->head_first)
-			set_exit_status(8);
+			set_exit_status(WG_EXIT_STATUS_REMOTE);
 		else if (resp->code == 404 && !job->robotstxt)
-			set_exit_status(8);
+			set_exit_status(WG_EXIT_STATUS_REMOTE);
 	}
 
 	// Server doesn't support keep-alive or want us to close the connection.
@@ -1308,31 +1305,30 @@ static int process_response_header(wget_http_response_t *resp)
 		return 0; // 302 with Metalink information
 
 	if (resp->code == 401) { // Unauthorized
-		if (job->challenges && !job->challenges_alloc)
-			return 0; // we already tried with credentials, they seem to be wrong. Don't try again.
+		job->auth_failure_count++;
 
-		// wget_http_free_challenges(&job->challenges);
-
-		if (!resp->challenges)
-			return 1; // no challenges offered, stop further processing
+		if (job->auth_failure_count > 1 || !resp->challenges) {
+			// We already tried with credentials and they are wrong OR
+			// The server sent no challenge. Don't try again.
+			set_exit_status(WG_EXIT_STATUS_AUTH);
+			return 1;
+		}
 
 		job->challenges = resp->challenges;
-		job->challenges_alloc = true;
-
 		resp->challenges = NULL;
 		job->inuse = 0; // try again, but with challenge responses
 		return 1; // stop further processing
 	}
 
 	if (resp->code == 407) { // Proxy Authentication Required
-		if (job->proxy_challenges)
-			return 0; // we already tried with credentials, they seem to be wrong. Don't try again.
+		if (job->proxy_challenges || !resp->challenges) {
+			// We already tried with credentials and they are wrong OR
+			// The proxy server sent no challenge. Don't try again.
+			set_exit_status(WG_EXIT_STATUS_AUTH);
+			return 1;
+		}
 
-		// wget_http_free_challenges(&job->proxy_challenges);
-
-		if (!(job->proxy_challenges = resp->challenges))
-			return 1; // no challenges offered, stop further processing
-
+		job->proxy_challenges = resp->challenges;
 		resp->challenges = NULL;
 		job->inuse = 0; // try again, but with challenge responses
 		return 1; // stop further processing
@@ -1353,25 +1349,8 @@ static int process_response_header(wget_http_response_t *resp)
 
 		wget_iri_relative_to_abs(iri, resp->location, strlen(resp->location), &uri_buf);
 
-//			if (!part) {
 		add_url(job, "utf-8", uri_buf.data, URL_FLG_REDIRECTION);
 		wget_buffer_deinit(&uri_buf);
-//			break;
-//			} else {
-				// directly follow when using metalink
-/*				if (iri != dont_free)
-					wget_iri_free(&iri);
-				iri = wget_iri_parse(uri_buf.data, NULL);
-				wget_buffer_deinit(&uri_buf);
-
-				// apply the HSTS check to the location URL
-				if (config.hsts && iri && iri->scheme == WGET_IRI_SCHEME_HTTP && wget_hsts_host_match(config.hsts_db, iri->host, atoi(iri->resolv_port))) {
-					info_printf("HSTS in effect for %s:%s\n", iri->host, iri->resolv_port);
-					iri_scheme = wget_iri_set_scheme(iri, WGET_IRI_SCHEME_HTTPS);
-				} else
-					iri_scheme = NULL;
-			}
-*/
 	}
 
 	return 0;
@@ -1515,6 +1494,7 @@ static void process_response_part(wget_http_response_t *resp)
 static void process_response(wget_http_response_t *resp)
 {
 	JOB *job = resp->req->user_data;
+	int process_decision = 0, recurse_decision = 0;
 
 	// just update number bytes read (body only) for display purposes
 	if (resp->body)
@@ -1607,8 +1587,50 @@ static void process_response(wget_http_response_t *resp)
 		}
 	}
 
+	// Forward response to plugins
+	if (resp->code == 200 || resp->code == 206 || resp->code == 416 || (resp->code == 304 && config.timestamping)) {
+		process_decision = job->local_filename || resp->body ? 1 : 0;
+		recurse_decision = process_decision && config.recursive
+			&& (!config.level || job->level < config.level + config.page_requisites) ? 1 : 0;
+		if (process_decision) {
+			wget_vector_t *recurse_iris = NULL;
+			int n_recurse_iris = 0;
+			const void *data = NULL;
+			uint64_t size;
+			const char *filename;
+
+			if (config.spider || (config.recursive && config.output_document))
+				filename = NULL;
+			else
+				filename = job->local_filename;
+
+			if ((resp->code == 304 || resp->code == 416 || resp->code == 206) && filename)
+				size = get_file_size(filename);
+			else
+				size = resp->content_length;
+
+			if ((resp->code == 200 || resp->code == 206) && resp->body && resp->body->length == size)
+				data = resp->body->data;
+
+			if (recurse_decision)
+				recurse_iris = wget_vector_create(16, -2, NULL);
+
+			process_decision = plugin_db_forward_downloaded_file(job->iri, size, filename, data, recurse_iris);
+
+			if (recurse_decision) {
+				n_recurse_iris = wget_vector_size(recurse_iris);
+				for (int i = 0; i < n_recurse_iris; i++) {
+					wget_iri_t *iri = (wget_iri_t *) wget_vector_get(recurse_iris, i);
+					add_url(job, "utf-8", iri->uri, 0);
+					wget_iri_free_content(iri);
+				}
+				wget_vector_free(&recurse_iris);
+			}
+		}
+	}
+
 	if (resp->code == 200 || resp->code == 206) {
-		if (config.recursive && (!config.level || job->level < config.level + config.page_requisites)) {
+		if (process_decision && recurse_decision) {
 			if (resp->content_type && resp->body) {
 				if (!wget_strcasecmp_ascii(resp->content_type, "text/html")) {
 					html_parse(job, job->level, resp->body->data, resp->body->length, resp->content_type_encoding ? resp->content_type_encoding : config.remote_encoding, job->iri);
@@ -1646,7 +1668,7 @@ static void process_response(wget_http_response_t *resp)
 		}
 	}
 	else if ((resp->code == 304 && config.timestamping) || resp->code == 416) { // local document is up-to-date
-		if (config.recursive && (!config.level || job->level < config.level + config.page_requisites) && job->local_filename) {
+		if (process_decision && recurse_decision) {
 			const char *ext;
 
 			if (config.content_disposition && resp->content_filename)
@@ -2524,7 +2546,7 @@ static int G_GNUC_WGET_NONNULL((1)) _prepare_file(wget_http_response_t *resp, co
 				size_t rc = safe_write(1, resp->header->data, resp->header->length);
 				if (rc == SAFE_WRITE_ERROR) {
 					error_printf(_("Failed to write to STDOUT (%zu, errno=%d)\n"), rc, errno);
-					set_exit_status(3);
+					set_exit_status(WG_EXIT_STATUS_IO);
 				}
 			}
 
@@ -2643,13 +2665,13 @@ static int G_GNUC_WGET_NONNULL((1)) _prepare_file(wget_http_response_t *resp, co
 				if (rc == SAFE_READ_ERROR || (long long) rc != size) {
 					error_printf(_("Failed to load partial content from '%s' (errno=%d): %s\n"),
 							fname, errno, strerror(errno));
-					set_exit_status(3);
+					set_exit_status(WG_EXIT_STATUS_IO);
 				}
 				close(fd);
 			} else {
 				error_printf(_("Failed to load partial content from '%s' (errno=%d): %s\n"),
 						fname, errno, strerror(errno));
-				set_exit_status(3);
+				set_exit_status(WG_EXIT_STATUS_IO);
 			}
 		}
 	}
@@ -2666,7 +2688,7 @@ static int G_GNUC_WGET_NONNULL((1)) _prepare_file(wget_http_response_t *resp, co
 		if (config.save_headers) {
 			if ((rc = write(fd, resp->header->data, resp->header->length)) != (ssize_t)resp->header->length) {
 				error_printf(_("Failed to write file %s (%zd, errno=%d)\n"), unique[0] ? unique : fname, rc, errno);
-				set_exit_status(3);
+				set_exit_status(WG_EXIT_STATUS_IO);
 			}
 		}
 	} else {
@@ -2677,7 +2699,7 @@ static int G_GNUC_WGET_NONNULL((1)) _prepare_file(wget_http_response_t *resp, co
 				info_printf(_("Directory / file name clash - not saving '%s'\n"), fname);
 			else {
 				error_printf(_("Failed to open '%s' (errno=%d): %s\n"), fname, errno, strerror(errno));
-				set_exit_status(3);
+				set_exit_status(WG_EXIT_STATUS_IO);
 			}
 		}
 	}
@@ -2690,7 +2712,7 @@ static int G_GNUC_WGET_NONNULL((1)) _prepare_file(wget_http_response_t *resp, co
 			fclose(fp);
 		} else {
 			error_printf(_("Failed to save extended attribute %s\n"), fname);
-			set_exit_status(3);
+			set_exit_status(WG_EXIT_STATUS_IO);
 		}
 	}
 
@@ -2730,13 +2752,13 @@ static int _get_header(wget_http_response_t *resp, void *context)
 		name = ctx->job->metalink->name;
 		ctx->outfd = open(ctx->job->metalink->name, O_WRONLY | O_CREAT | O_NONBLOCK | O_BINARY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		if (ctx->outfd == -1) {
-			set_exit_status(3);
+			set_exit_status(WG_EXIT_STATUS_IO);
 			ret = -1;
 			goto out;
 		}
 		if (lseek(ctx->outfd, part->position, SEEK_SET) == (off_t) -1) {
 			close(ctx->outfd);
-			set_exit_status(3);
+			set_exit_status(WG_EXIT_STATUS_IO);
 			ret = -1;
 			goto out;
 		}
@@ -2807,7 +2829,7 @@ static int _get_body(wget_http_response_t *resp, void *context, const char *data
 		if (written == SAFE_WRITE_ERROR) {
 			if (!terminate)
 				error_printf(_("Failed to write errno=%d\n"), errno);
-			set_exit_status(3);
+			set_exit_status(WG_EXIT_STATUS_IO);
 			return -1;
 		}
 	}
@@ -3117,7 +3139,7 @@ wget_http_response_t *http_receive_response(wget_http_connection_t *conn)
 		if (config.fsync_policy) {
 			if (fsync(context->outfd) < 0 && errno == EIO) {
 				error_printf(_("Failed to fsync errno=%d\n"), errno);
-				set_exit_status(3);
+				set_exit_status(WG_EXIT_STATUS_IO);
 			}
 		}
 

@@ -245,7 +245,9 @@ if test "$gl_cc_sanitize_msan" = yes; then
   gl_WARN_ADD([-fsanitize-memory-track-origins])
 
   # gcc options
-  gl_WARN_ADD([-fsanitize=leak])
+  if test "$CCNAME" = "gcc"; then
+    gl_WARN_ADD([-fsanitize=leak])
+  fi
 
   gl_WARN_ADD([-fno-omit-frame-pointer])
   gl_WARN_ADD([-fPIE])
@@ -597,7 +599,7 @@ AM_CONDITIONAL([PLUGIN_SUPPORT], [test "x$plugin_support" = xyes])
 
 # Checks for header files.
 AC_CHECK_HEADERS([\
- crypt.h idna.h idn/idna.h idn2.h unicase.h netinet/tcp.h])
+ crypt.h idna.h idn/idna.h idn2.h unicase.h netinet/tcp.h sys/uio.h])
 
 # Checks for library functions.
 AC_FUNC_FORK
