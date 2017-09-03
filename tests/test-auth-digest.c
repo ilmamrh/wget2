@@ -1,6 +1,5 @@
 /*
- * Copyright(c) 2013 Tim Ruehsen
- * Copyright(c) 2015-2016 Free Software Foundation, Inc.
+ * Copyright(c) 2017 Free Software Foundation, Inc.
  *
  * This file is part of libwget.
  *
@@ -18,7 +17,7 @@
  * along with libwget.  If not, see <https://www.gnu.org/licenses/>.
  *
  *
- * Testing Wget
+ * Testing authentication using digest scheme
  *
  * Changelog
  * 17.08.2017  Didik Setiawan  created
@@ -89,7 +88,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --password=" password,
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -98,7 +97,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=\"\" --password=" password,
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -107,7 +106,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=\"whatever\" --password=" password,
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -116,7 +115,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=" username,
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -125,7 +124,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=" username " --password=\"\"",
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -134,7 +133,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=" username " --password=\"whatever\"",
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -143,7 +142,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d",
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -152,7 +151,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=\"\" --password=\"\"",
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
@@ -161,7 +160,7 @@ int main(void)
 //		WGET_TEST_KEEP_TMPFILES, 1,
 		WGET_TEST_OPTIONS, "-d --user=\"whatever\" --password=\"whatever\"",
 		WGET_TEST_REQUEST_URL, urls[0].name + 1,
-		WGET_TEST_EXPECTED_ERROR_CODE, 0,
+		WGET_TEST_EXPECTED_ERROR_CODE, 6,
 		WGET_TEST_EXPECTED_FILES, &(wget_test_file_t []) {
 			{ NULL } },
 		0);
